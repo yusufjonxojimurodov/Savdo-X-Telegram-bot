@@ -1,14 +1,33 @@
 require("dotenv").config();
-const TelegramBot = require("node-telegram-bot-api");
 const express = require("express");
-const app = express();
+const TelegramBot = require("node-telegram-bot-api");
 
+const app = express();
 const token = process.env.BOT_TOKEN;
 const ADMIN_CHAT_ID = Number(process.env.ADMIN_CHAT_ID);
 
-const bot = new TelegramBot(token, { polling: true });
+app.use(express.json());
 
-// Menyu dizayni — 1 tugma 1 qatorda, Markdown bilan sal chiroyliroq
+// Telegram bot obyekti (polling emas, webhook uchun)
+const bot = new TelegramBot(token);
+
+// Webhook endpoint — Telegram shu yerga POST so‘rov yuboradi
+app.post(`/webhook/${token}`, (req, res) => {
+  bot.processUpdate(req.body);
+  res.sendStatus(200);
+});
+
+// Bot uchun xabarlarni eshitish
+bot.onText(/\/start/, (msg) => {
+  const chatId = msg.chat.id;
+  const userName = msg.from.first_name || "Foydalanuvchi";
+  sendMainMenu(chatId, userName);
+  userStates[chatId] = null;
+});
+
+const userStates = {};
+const adminReplyingTo = {};
+
 function sendMainMenu(chatId, userName) {
   const text = `*Salom ${userName}!* \nSavdo X telegram botiga Xush Kelibsiz!\n\nQuyidagi menyulardan birini tanlang:`;
   const options = {
@@ -28,39 +47,18 @@ function sendMainMenu(chatId, userName) {
   bot.sendMessage(chatId, text, options);
 }
 
-// Foydalanuvchi holatlari
-const userStates = {}; // userChatId => holat string yoki null
-const adminReplyingTo = {}; // adminChatId => userChatId (admin kimga javob yozmoqda)
-
-// /start buyruq uchun
-bot.onText(/\/start/, (msg) => {
-  const chatId = msg.chat.id;
-  const userName = msg.from.first_name || "Foydalanuvchi";
-
-  sendMainMenu(chatId, userName);
-  userStates[chatId] = null;
-});
-
-// Asosiy xabarlarni qabul qilish
 bot.on("message", (msg) => {
   const chatId = msg.chat.id;
   const text = msg.text;
-  const userName = msg.from.first_name || "Foydalanuvchi";
   const username = msg.from.username || "username yo‘q";
 
-  // Agar admin javob yozish rejimida bo‘lsa (foydalanuvchiga xabar yuborish)
+  // Admin javob yozsa
   if (adminReplyingTo[chatId]) {
     const userChatId = adminReplyingTo[chatId];
-
-    bot.sendMessage(
-      userChatId,
-      `Admin sizni qabul qildi va quyidagilarni yozdi:\n\n${text}`
-    );
-
+    bot.sendMessage(userChatId, `Admin javobi:\n\n${text}`);
     bot.sendMessage(chatId, "Xabaringiz foydalanuvchiga yuborildi.");
-
     delete adminReplyingTo[chatId];
-    return; // boshqa handlerlarga xabar o‘tmasligi uchun
+    return;
   }
 
   if (!userStates[chatId]) {
@@ -70,7 +68,7 @@ bot.on("message", (msg) => {
     } else if (text === "Mahsulot egasidan Shikoyat") {
       bot.sendMessage(
         chatId,
-        "Iltimos, shikoyat qilmoqchi bo‘lgan mahsulot nomini va egasining username'ini yuboring:"
+        "Iltimos, shikoyat qilmoqchi bo‘lgan mahsulot nomi va egasining username'ini yuboring:"
       );
       userStates[chatId] = "waiting_complaint";
     } else if (text === "Saytdagi Muammolar") {
@@ -88,12 +86,12 @@ bot.on("message", (msg) => {
     } else if (text === "Savdo X saytida mahsulot sotish") {
       bot.sendMessage(
         chatId,
-        `*Savdo X saytida mahsulot sotish* bo‘yicha:\n\nSavdo X saytida mahsulotni sotish togrsda qonunlar bor va Savdo X saytimizdan foydalanayotganingiz o'z mahsulotingizni sotayotganingiz uchun bizga oyiga 35 ming so'm tolashingiz kerak bo'ladi.Rozi bo‘lsangiz va Savdo X qonunlari bilan tanishishni istasangiz, iltimos, menyulardan _Adminga bog‘lanish_ tugmasini bosib, admin bilan bog‘laning.`,
+        `*Savdo X saytida mahsulot sotish* bo‘yicha:\n\nSavdo X saytida mahsulotni sotish to‘g‘risida qonunlar bor va Savdo X saytimizdan foydalanayotganingiz uchun oyiga 35 ming so‘m to‘lashingiz kerak. Rozi bo‘lsangiz, "Adminga bog‘lanish" tugmasini bosing.`,
         { parse_mode: "Markdown" }
       );
       userStates[chatId] = null;
     } else if (text.startsWith("/start")) {
-      // Hech narsa qilmasdan ketamiz
+      // /start uchun alohida javob berildi
     } else {
       bot.sendMessage(
         chatId,
@@ -101,10 +99,7 @@ bot.on("message", (msg) => {
       );
     }
   } else {
-    // Foydalanuvchi hozir xabar yozmoqda, uni adminga yuboramiz
-
     let forwardedMessage = "";
-
     switch (userStates[chatId]) {
       case "waiting_admin_message":
         forwardedMessage = `Foydalanuvchi @${username} dan adminga xabar:\n\n${text}`;
@@ -124,7 +119,6 @@ bot.on("message", (msg) => {
         return;
     }
 
-    // Admin chatga yuboramiz inline tugmalar bilan
     bot.sendMessage(ADMIN_CHAT_ID, forwardedMessage, {
       reply_markup: {
         inline_keyboard: [
@@ -137,12 +131,10 @@ bot.on("message", (msg) => {
     });
 
     bot.sendMessage(chatId, "Xabaringiz adminga yuborildi, javobni kuting.");
-
     userStates[chatId] = null;
   }
 });
 
-// Admin tugmalar bosganida ishlov beramiz
 bot.on("callback_query", (callbackQuery) => {
   const msg = callbackQuery.message;
   const data = callbackQuery.data;
@@ -151,13 +143,11 @@ bot.on("callback_query", (callbackQuery) => {
   const chatId = parseInt(userChatId);
 
   if (action === "accept") {
-    // Admin foydalanuvchiga javob yozishi uchun holatga o'tamiz
     const adminChatId = callbackQuery.from.id;
     adminReplyingTo[adminChatId] = chatId;
-
     bot.sendMessage(
       adminChatId,
-      `Siz foydalanuvchini qabul qildingiz.\n\nIltimos, foydalanuvchiga jo'natmoqchi bo'lgan xabaringizni yozing:`
+      "Siz foydalanuvchini qabul qildingiz.\n\nIltimos, foydalanuvchiga jo'natmoqchi bo'lgan xabaringizni yozing:"
     );
   } else if (action === "reject") {
     bot.sendMessage(chatId, "Admin sizning xabaringizni o‘tkazib yubordi ❌");
@@ -167,8 +157,8 @@ bot.on("callback_query", (callbackQuery) => {
   bot.answerCallbackQuery(callbackQuery.id);
 });
 
-app.get('/', (req, res) => {
-  res.send('Bot ishlayapti!');
+app.get("/", (req, res) => {
+  res.send("Bot ishlayapti!");
 });
 
 const port = process.env.PORT || 3000;
