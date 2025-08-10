@@ -164,3 +164,8 @@ bot.on("callback_query", (callbackQuery) => {
 
   bot.answerCallbackQuery(callbackQuery.id);
 });
+
+const port = process.env.PORT || 3000;
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
+});
