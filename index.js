@@ -1,5 +1,7 @@
 require("dotenv").config();
 const TelegramBot = require("node-telegram-bot-api");
+const express = require("express");
+const app = express();
 
 const token = process.env.BOT_TOKEN;
 const ADMIN_CHAT_ID = Number(process.env.ADMIN_CHAT_ID);
@@ -163,6 +165,10 @@ bot.on("callback_query", (callbackQuery) => {
   }
 
   bot.answerCallbackQuery(callbackQuery.id);
+});
+
+app.get('/', (req, res) => {
+  res.send('Bot ishlayapti!');
 });
 
 const port = process.env.PORT || 3000;
