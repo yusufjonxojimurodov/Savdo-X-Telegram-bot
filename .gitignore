@@ -1,0 +1,16 @@
+# Node.js ga oid papkalar va fayllar
+node_modules/
+
+# Environment fayllar (maxfiy ma'lumotlar uchun)
+.env
+
+# Log fayllar
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS fayllari (masalan, macOS uchun)
+.DS_Store
+
+# VSCode sozlamalari
+.vscode/
