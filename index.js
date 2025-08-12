@@ -1,28 +1,22 @@
 require("dotenv").config();
-const express = require("express");
 const TelegramBot = require("node-telegram-bot-api");
+const express = require("express");
+const bodyParser = require("body-parser");
 
-const app = express();
 const token = process.env.BOT_TOKEN;
 const ADMIN_CHAT_ID = Number(process.env.ADMIN_CHAT_ID);
+const PORT = process.env.PORT || 3000; 
+const URL = process.env.URL || "https://your-domain.com";
 
-app.use(express.json());
+const bot = new TelegramBot(token, { webHook: true });
+bot.setWebHook(`${URL}/bot${token}`);
 
-// Telegram bot obyekti (polling emas, webhook uchun)
-const bot = new TelegramBot(token);
+const app = express();
+app.use(bodyParser.json());
 
-// Webhook endpoint — Telegram shu yerga POST so‘rov yuboradi
-app.post(`/webhook/${token}`, (req, res) => {
+app.post(`/bot${token}`, (req, res) => {
   bot.processUpdate(req.body);
   res.sendStatus(200);
-});
-
-// Bot uchun xabarlarni eshitish
-bot.onText(/\/start/, (msg) => {
-  const chatId = msg.chat.id;
-  const userName = msg.from.first_name || "Foydalanuvchi";
-  sendMainMenu(chatId, userName);
-  userStates[chatId] = null;
 });
 
 const userStates = {};
@@ -47,12 +41,18 @@ function sendMainMenu(chatId, userName) {
   bot.sendMessage(chatId, text, options);
 }
 
+bot.onText(/\/start/, (msg) => {
+  const chatId = msg.chat.id;
+  const userName = msg.from.first_name || "Foydalanuvchi";
+  sendMainMenu(chatId, userName);
+  userStates[chatId] = null;
+});
+
 bot.on("message", (msg) => {
   const chatId = msg.chat.id;
   const text = msg.text;
   const username = msg.from.username || "username yo‘q";
 
-  // Admin javob yozsa
   if (adminReplyingTo[chatId]) {
     const userChatId = adminReplyingTo[chatId];
     bot.sendMessage(userChatId, `Admin javobi:\n\n${text}`);
@@ -91,7 +91,6 @@ bot.on("message", (msg) => {
       );
       userStates[chatId] = null;
     } else if (text.startsWith("/start")) {
-      // /start uchun alohida javob berildi
     } else {
       bot.sendMessage(
         chatId,
@@ -136,9 +135,7 @@ bot.on("message", (msg) => {
 });
 
 bot.on("callback_query", (callbackQuery) => {
-  const msg = callbackQuery.message;
   const data = callbackQuery.data;
-
   const [action, userChatId] = data.split("_");
   const chatId = parseInt(userChatId);
 
@@ -150,18 +147,13 @@ bot.on("callback_query", (callbackQuery) => {
       "Siz foydalanuvchini qabul qildingiz.\n\nIltimos, foydalanuvchiga jo'natmoqchi bo'lgan xabaringizni yozing:"
     );
   } else if (action === "reject") {
-    bot.sendMessage(chatId, "Admin sizning xabaringizni o‘tkazib yubordi ❌");
-    bot.sendMessage(ADMIN_CHAT_ID, "Siz foydalanuvchini o‘tkazdingiz.");
+    bot.sendMessage(chatId, "Admin sizning xabaringizni bekor qildi ❌");
+    bot.sendMessage(ADMIN_CHAT_ID, "Siz foydalanuvchini bekor qildingiz.");
   }
 
   bot.answerCallbackQuery(callbackQuery.id);
 });
 
-app.get("/", (req, res) => {
-  res.send("Bot ishlayapti!");
-});
-
-const port = process.env.PORT || 3000;
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
+app.listen(PORT, () => {
+  console.log(`Server ${PORT} portda ishlayapti ✅`);
 });
