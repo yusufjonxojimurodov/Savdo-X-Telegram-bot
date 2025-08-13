@@ -19,12 +19,11 @@ app.post(`/bot${token}`, (req, res) => {
   res.sendStatus(200);
 });
 
-// State va ro'yxatlar
 const userStates = {};
 const adminReplyingTo = {};
 const blockedUsers = {};
+const usersInfo = {};
 
-// Foydalanuvchi menyusi
 function sendMainMenu(chatId, userName) {
   const text = `*Salom ${userName}!* \nSavdo X telegram botiga Xush Kelibsiz😊!\n\nQuyidagi menyulardan birini tanlang:\n\nOgohlantirish⚠️ \nSavdo X Botimiz test rejimda ishlamoqda noqulayliklar uchun uzr so‘raymiz☹️`;
   const options = {
@@ -44,42 +43,44 @@ function sendMainMenu(chatId, userName) {
   bot.sendMessage(chatId, text, options);
 }
 
-// /start
+function sendAdminMenu(chatId) {
+  const text = "Xush kelibsiz, Admin! Quyidagi menyudan tanlang:";
+  bot.sendMessage(chatId, text, {
+    reply_markup: {
+      keyboard: [
+        ["Adminga bog‘lanish📲"],
+        ["Mahsulot egasidan Shikoyat⚠️"],
+        ["Saytdagi Muammolar🐞"],
+        ["Saytimizga takliflar📃"],
+        ["Savdo X saytida mahsulot sotish🛒"],
+        ["Foydalanuvchilar ro'yxati"],
+      ],
+      resize_keyboard: true,
+      one_time_keyboard: true,
+    },
+  });
+}
+
 bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id;
   const userName = msg.from.first_name || "Foydalanuvchi";
+  const username = msg.from.username || "username yo‘q";
 
-  // Admin menyusi
-  if (chatId === ADMIN_CHAT_ID) {
-    const text = "Xush kelibsiz, Admin! Quyidagi menyudan tanlang:";
-    bot.sendMessage(chatId, text, {
-      reply_markup: {
-        keyboard: [["Foydalanuvchilar ro'yxati"], ["Boshqa admin menyu"]],
-        resize_keyboard: true,
-        one_time_keyboard: true,
-      },
-    });
-  } else {
-    sendMainMenu(chatId, userName);
-  }
-  userStates[chatId] = null;
-});
+  usersInfo[chatId] = { username, first_name: userName };
 
-// message handler
-bot.on("message", (msg) => {
-  const chatId = msg.chat.id;
-  const text = msg.text;
-  const username = msg.from.username || msg.from.first_name || "username yo‘q";
-
-  // Agar foydalanuvchi blocklangan bo'lsa
   if (blockedUsers[chatId]) {
     bot.sendMessage(
+      chatId,
+      "Siz blocklangansiz ❌. Faqat /start buyrug‘ini yuborishingiz mumkin."
+    );
+
+    bot.sendMessage(
       ADMIN_CHAT_ID,
-      `Blocklangan foydalanuvchi @${username} botga xabar yozmoqchi.\nBlockdan chiqarilsinmi?`,
+      `Blocklangan foydalanuvchi @${username} botga xabar yozmoqchi. Blockdan chiqarilsinmi?`,
       {
         reply_markup: {
           inline_keyboard: [
-            [{ text: "Yoq ❌", callback_data: `deny_${chatId}` }],
+            [{ text: "Yo‘q ❌", callback_data: `deny_${chatId}` }],
             [
               {
                 text: "Blockdan chiqarish ✅",
@@ -93,27 +94,57 @@ bot.on("message", (msg) => {
     return;
   }
 
-  // Admin foydalanuvchilarga xabar yozayotgan bo'lsa
+  if (chatId === ADMIN_CHAT_ID) sendAdminMenu(chatId);
+  else sendMainMenu(chatId, userName);
+
+  userStates[chatId] = null;
+});
+
+bot.on("message", (msg) => {
+  const chatId = msg.chat.id;
+  const text = msg.text; // text bo'lmasa undefined
+  const username = msg.from.username || msg.from.first_name || "username yo‘q";
+
+  if (blockedUsers[chatId]) return;
+
+  // Agar foydalanuvchi text bo'lmagan xabar yuborsa
+  if (!text) {
+    bot.sendMessage(
+      chatId,
+      "Iltimos, menyudan tanlang yoki /start buyrug‘ini yuboring."
+    );
+    return;
+  }
+
+  // Admin javob yozayotgan bo'lsa
   if (chatId === ADMIN_CHAT_ID && adminReplyingTo[chatId]) {
-    const userChatId = adminReplyingTo[chatId];
-    bot.sendMessage(userChatId, `Admin javobi:\n\n${text}`);
-    bot.sendMessage(chatId, "Xabaringiz foydalanuvchiga yuborildi.");
+    const target = adminReplyingTo[chatId];
+
+    if (target === "all") {
+      Object.keys(usersInfo).forEach((uid) => {
+        bot.sendMessage(parseInt(uid), `Admindan xabar:\n\n${text}`);
+      });
+      bot.sendMessage(chatId, "Xabar barcha foydalanuvchilarga yuborildi ✅");
+    } else {
+      bot.sendMessage(target, `Admindan xabar:\n\n${text}`);
+      bot.sendMessage(chatId, "Xabaringiz foydalanuvchiga yuborildi ✅");
+    }
+
     delete adminReplyingTo[chatId];
     return;
   }
 
-  // Foydalanuvchi menyusini tanlaganida eski state'ni reset qilish
-  const menus = [
+  const userMenus = [
     "Adminga bog‘lanish📲",
     "Mahsulot egasidan Shikoyat⚠️",
     "Saytdagi Muammolar🐞",
     "Saytimizga takliflar📃",
     "Savdo X saytida mahsulot sotish🛒",
   ];
-  if (menus.includes(text)) userStates[chatId] = null;
+  const adminMenus = [...userMenus, "Foydalanuvchilar ro'yxati"];
+  const currentMenus = chatId === ADMIN_CHAT_ID ? adminMenus : userMenus;
 
-  // Foydalanuvchi menyulari
-  if (!userStates[chatId]) {
+  if (currentMenus.includes(text)) {
     switch (text) {
       case "Adminga bog‘lanish📲":
         bot.sendMessage(
@@ -150,14 +181,29 @@ bot.on("message", (msg) => {
           { parse_mode: "Markdown" }
         );
         break;
-      default:
-        bot.sendMessage(
-          chatId,
-          "Iltimos, menyudan tanlang yoki /start buyrug‘ini yuboring."
-        );
+      case "Foydalanuvchilar ro'yxati":
+        if (chatId === ADMIN_CHAT_ID) {
+          const buttons = Object.entries(usersInfo).map(([id, info]) => {
+            return [
+              { text: `${info.username} (${id})`, callback_data: `msg_${id}` },
+            ];
+          });
+          buttons.push([
+            {
+              text: "Barcha foydalanuvchilarga xabar yuborish",
+              callback_data: "broadcast_all",
+            },
+          ]);
+          bot.sendMessage(chatId, "Foydalanuvchilar ro'yxati:", {
+            reply_markup: { inline_keyboard: buttons },
+          });
+        }
+        break;
     }
-  } else {
-    // foydalanuvchi xabar yuboradi va adminga forward qilinadi
+    return;
+  }
+
+  if (userStates[chatId]) {
     let forwardedMessage = "";
     switch (userStates[chatId]) {
       case "waiting_admin_message":
@@ -174,7 +220,6 @@ bot.on("message", (msg) => {
         break;
       default:
         bot.sendMessage(chatId, "Nimadir noto‘g‘ri ketdi☹️, /start ni bosing.");
-        userStates[chatId] = null;
         return;
     }
 
@@ -190,59 +235,61 @@ bot.on("message", (msg) => {
       },
     });
 
-    bot.sendMessage(
-      chatId,
-      "Xabaringiz adminga yuborildi✅, javobni kuting⌚."
-    );
+    bot.sendMessage(chatId, "Xabaringiz adminga yuborildi✅, javobni kuting⌚");
     userStates[chatId] = null;
   }
 });
 
-// callback_query handler
 bot.on("callback_query", (callbackQuery) => {
   const data = callbackQuery.data;
-  const [action, userChatId] = data.split("_");
-  const chatId = parseInt(userChatId);
 
-  if (action === "accept") {
-    const adminChatId = callbackQuery.from.id;
-    adminReplyingTo[adminChatId] = chatId;
-    bot.sendMessage(
-      adminChatId,
-      "Siz foydalanuvchini qabul qildingiz.\n\nIltimos, foydalanuvchiga jo'natmoqchi bo'lgan xabaringizni yozing:"
-    );
-  } else if (action === "reject") {
-    bot.sendMessage(chatId, "Admin sizning xabaringizni bekor qildi ❌");
-    bot.sendMessage(ADMIN_CHAT_ID, "Siz foydalanuvchini bekor qildingiz❌.");
-  } else if (action === "block") {
-    blockedUsers[chatId] = true;
-    bot.sendMessage(chatId, "Siz block qilindingiz ❌");
-    bot.sendMessage(ADMIN_CHAT_ID, `Foydalanuvchi ${chatId} block qilindi`);
-  } else if (action === "unblock") {
-    delete blockedUsers[chatId];
-    bot.sendMessage(
-      chatId,
-      "Siz blockdan chiqarildingiz ✅\nBot qonunlariga rioya qiling!"
-    );
-    bot.sendMessage(
-      ADMIN_CHAT_ID,
-      `Foydalanuvchi ${chatId} blockdan chiqarildi`
-    );
-  } else if (action === "deny") {
-    bot.sendMessage(chatId, "Siz blocklangansiz ❌");
-    bot.sendMessage(ADMIN_CHAT_ID, `Foydalanuvchi ${chatId} blocklangansiz`);
-  } else if (action === "message") {
-    adminReplyingTo[callbackQuery.from.id] = chatId;
+  if (data.startsWith("msg_")) {
+    const userId = parseInt(data.split("_")[1]);
+    adminReplyingTo[callbackQuery.from.id] = userId;
     bot.sendMessage(
       callbackQuery.from.id,
-      "Xabar yozing, foydalanuvchiga yuboriladi:"
+      `Foydalanuvchi @${usersInfo[userId].username} ga xabar yozing:`
     );
+  } else if (data === "broadcast_all") {
+    adminReplyingTo[callbackQuery.from.id] = "all";
+    bot.sendMessage(
+      callbackQuery.from.id,
+      "Barcha foydalanuvchilarga xabar yozing:"
+    );
+  } else {
+    const [action, userChatId] = data.split("_");
+    const chatId = parseInt(userChatId);
+
+    if (action === "accept") {
+      const adminChatId = callbackQuery.from.id;
+      adminReplyingTo[adminChatId] = chatId;
+      bot.sendMessage(
+        adminChatId,
+        "Siz foydalanuvchini qabul qildingiz. Xabaringizni yozing:"
+      );
+    } else if (action === "reject") {
+      bot.sendMessage(chatId, "Admin sizning xabaringizni bekor qildi ❌");
+      bot.sendMessage(ADMIN_CHAT_ID, "Siz foydalanuvchini bekor qildingiz❌.");
+    } else if (action === "block") {
+      blockedUsers[chatId] = true;
+      bot.sendMessage(chatId, "Siz block qilindingiz ❌");
+      bot.sendMessage(ADMIN_CHAT_ID, `Foydalanuvchi ${chatId} block qilindi`);
+    } else if (action === "unblock") {
+      delete blockedUsers[chatId];
+      bot.sendMessage(chatId, "Siz blockdan chiqarildingiz ✅");
+      bot.sendMessage(
+        ADMIN_CHAT_ID,
+        `Foydalanuvchi ${chatId} blockdan chiqarildi`
+      );
+    } else if (action === "deny") {
+      bot.sendMessage(chatId, "Siz blocklangansiz ❌");
+      bot.sendMessage(ADMIN_CHAT_ID, `Foydalanuvchi ${chatId} blocklangansiz`);
+    }
   }
 
   bot.answerCallbackQuery(callbackQuery.id);
 });
 
-// server
 app.listen(PORT, () => {
   console.log(`Server ${PORT} portda ishlayapti ✅`);
 });
