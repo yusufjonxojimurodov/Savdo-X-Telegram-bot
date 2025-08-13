@@ -62,7 +62,7 @@ bot.on("message", (msg) => {
   }
 
   if (!userStates[chatId]) {
-    if (text === "Adminga bog‘lanish") {
+    if (text === "Adminga bog‘lanish📲") {
       bot.sendMessage(chatId, "Xabaringizni yozing📝, men adminga yuboraman.");
       userStates[chatId] = "waiting_admin_message";
     } else if (text === "Mahsulot egasidan Shikoyat") {
@@ -71,19 +71,19 @@ bot.on("message", (msg) => {
         "Iltimos, shikoyat qilmoqchi bo‘lgan mahsulot nomi va egasining username'ini yuboring:"
       );
       userStates[chatId] = "waiting_complaint";
-    } else if (text === "Saytdagi Muammolar") {
+    } else if (text === "Saytdagi Muammolar🐞") {
       bot.sendMessage(
         chatId,
         "Saytdagi muammolar haqida yozing📝, tez orada ko‘rib chiqamiz👀."
       );
       userStates[chatId] = "waiting_site_issues";
-    } else if (text === "Saytimizga takliflar") {
+    } else if (text === "Saytimizga takliflar📃") {
       bot.sendMessage(
         chatId,
         "Takliflaringizni yozing, biz ularga albatta e'tibor beramiz😊."
       );
       userStates[chatId] = "waiting_suggestions";
-    } else if (text === "Savdo X saytida mahsulot sotish") {
+    } else if (text === "Savdo X saytida mahsulot sotish🛒") {
       bot.sendMessage(
         chatId,
         `*Savdo X saytida mahsulot sotish* bo‘yicha:\n\nSavdo X saytida mahsulotni sotish to‘g‘risida qonunlar bor❗ va Savdo X saytimizdan foydalanayotganingiz uchun oyiga 35 ming so‘m💵 to‘lashingiz kerak. Rozi bo‘lsangiz, "Adminga bog‘lanish📞" tugmasini bosing.`,
