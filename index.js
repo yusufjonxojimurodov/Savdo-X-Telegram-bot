@@ -5,7 +5,7 @@ const bodyParser = require("body-parser");
 
 const token = process.env.BOT_TOKEN;
 const ADMIN_CHAT_ID = Number(process.env.ADMIN_CHAT_ID);
-const PORT = process.env.PORT || 3000; 
+const PORT = process.env.PORT || 3000;
 const URL = process.env.URL || "https://your-domain.com";
 
 const bot = new TelegramBot(token, { webHook: true });
@@ -23,16 +23,16 @@ const userStates = {};
 const adminReplyingTo = {};
 
 function sendMainMenu(chatId, userName) {
-  const text = `*Salom ${userName}!* \nSavdo X telegram botiga Xush Kelibsiz!\n\nQuyidagi menyulardan birini tanlang:`;
+  const text = `*Salom ${userName}!* \nSavdo X telegram botiga Xush Kelibsiz😊!\n\nQuyidagi menyulardan birini tanlang:\n\n\n Ogohlantirish⚠️ \nSavdo X Botimiz test rejimda ishlamoqda noqlulayliklar uchun uzur so'raymiz☹️`;
   const options = {
     parse_mode: "Markdown",
     reply_markup: {
       keyboard: [
-        ["Adminga bog‘lanish"],
-        ["Mahsulot egasidan Shikoyat"],
-        ["Saytdagi Muammolar"],
-        ["Saytimizga takliflar"],
-        ["Savdo X saytida mahsulot sotish"],
+        ["Adminga bog‘lanish📲"],
+        ["Mahsulot egasidan Shikoyat⚠️"],
+        ["Saytdagi Muammolar🐞"],
+        ["Saytimizga takliflar📃"],
+        ["Savdo X saytida mahsulot sotish🛒"],
       ],
       resize_keyboard: true,
       one_time_keyboard: true,
@@ -63,7 +63,7 @@ bot.on("message", (msg) => {
 
   if (!userStates[chatId]) {
     if (text === "Adminga bog‘lanish") {
-      bot.sendMessage(chatId, "Xabaringizni yozing, men adminga yuboraman.");
+      bot.sendMessage(chatId, "Xabaringizni yozing📝, men adminga yuboraman.");
       userStates[chatId] = "waiting_admin_message";
     } else if (text === "Mahsulot egasidan Shikoyat") {
       bot.sendMessage(
@@ -74,19 +74,19 @@ bot.on("message", (msg) => {
     } else if (text === "Saytdagi Muammolar") {
       bot.sendMessage(
         chatId,
-        "Saytdagi muammolar haqida yozing, tez orada ko‘rib chiqamiz."
+        "Saytdagi muammolar haqida yozing📝, tez orada ko‘rib chiqamiz👀."
       );
       userStates[chatId] = "waiting_site_issues";
     } else if (text === "Saytimizga takliflar") {
       bot.sendMessage(
         chatId,
-        "Takliflaringizni yozing, biz ularga albatta e'tibor beramiz."
+        "Takliflaringizni yozing, biz ularga albatta e'tibor beramiz😊."
       );
       userStates[chatId] = "waiting_suggestions";
     } else if (text === "Savdo X saytida mahsulot sotish") {
       bot.sendMessage(
         chatId,
-        `*Savdo X saytida mahsulot sotish* bo‘yicha:\n\nSavdo X saytida mahsulotni sotish to‘g‘risida qonunlar bor va Savdo X saytimizdan foydalanayotganingiz uchun oyiga 35 ming so‘m to‘lashingiz kerak. Rozi bo‘lsangiz, "Adminga bog‘lanish" tugmasini bosing.`,
+        `*Savdo X saytida mahsulot sotish* bo‘yicha:\n\nSavdo X saytida mahsulotni sotish to‘g‘risida qonunlar bor❗ va Savdo X saytimizdan foydalanayotganingiz uchun oyiga 35 ming so‘m💵 to‘lashingiz kerak. Rozi bo‘lsangiz, "Adminga bog‘lanish📞" tugmasini bosing.`,
         { parse_mode: "Markdown" }
       );
       userStates[chatId] = null;
@@ -101,19 +101,19 @@ bot.on("message", (msg) => {
     let forwardedMessage = "";
     switch (userStates[chatId]) {
       case "waiting_admin_message":
-        forwardedMessage = `Foydalanuvchi @${username} dan adminga xabar:\n\n${text}`;
+        forwardedMessage = `Foydalanuvchi @${username}👤 dan adminga xabar:\n\n${text}`;
         break;
       case "waiting_complaint":
-        forwardedMessage = `Foydalanuvchi @${username} dan mahsulot egasidan shikoyat:\n\n${text}`;
+        forwardedMessage = `Foydalanuvchi @${username}👤 dan mahsulot egasidan shikoyat:\n\n${text}`;
         break;
       case "waiting_site_issues":
-        forwardedMessage = `Foydalanuvchi @${username} dan saytdagi muammolar:\n\n${text}`;
+        forwardedMessage = `Foydalanuvchi @${username}👤 dan saytdagi muammolar:\n\n${text}`;
         break;
       case "waiting_suggestions":
-        forwardedMessage = `Foydalanuvchi @${username} dan sayt takliflari:\n\n${text}`;
+        forwardedMessage = `Foydalanuvchi @${username}👤 dan sayt takliflari:\n\n${text}`;
         break;
       default:
-        bot.sendMessage(chatId, "Nimadir noto‘g‘ri ketdi, /start ni bosing.");
+        bot.sendMessage(chatId, "Nimadir noto‘g‘ri ketdi☹️, /start ni bosing.");
         userStates[chatId] = null;
         return;
     }
@@ -122,14 +122,17 @@ bot.on("message", (msg) => {
       reply_markup: {
         inline_keyboard: [
           [
-            { text: "Qabul qilaman", callback_data: `accept_${chatId}` },
-            { text: "O'tkazaman", callback_data: `reject_${chatId}` },
+            { text: "Qabul qilaman✅", callback_data: `accept_${chatId}` },
+            { text: "Bekor qilaman❌", callback_data: `reject_${chatId}` },
           ],
         ],
       },
     });
 
-    bot.sendMessage(chatId, "Xabaringiz adminga yuborildi, javobni kuting.");
+    bot.sendMessage(
+      chatId,
+      "Xabaringiz adminga yuborildi✅, javobni kuting⌚."
+    );
     userStates[chatId] = null;
   }
 });
@@ -148,7 +151,7 @@ bot.on("callback_query", (callbackQuery) => {
     );
   } else if (action === "reject") {
     bot.sendMessage(chatId, "Admin sizning xabaringizni bekor qildi ❌");
-    bot.sendMessage(ADMIN_CHAT_ID, "Siz foydalanuvchini bekor qildingiz.");
+    bot.sendMessage(ADMIN_CHAT_ID, "Siz foydalanuvchini bekor qildingiz❌.");
   }
 
   bot.answerCallbackQuery(callbackQuery.id);
