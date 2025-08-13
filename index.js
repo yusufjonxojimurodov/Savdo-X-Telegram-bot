@@ -20,9 +20,9 @@ app.post(`/bot${token}`, (req, res) => {
 });
 
 // State va ro'yxatlar
-const userStates = {}; // foydalanuvchi menyu holati
-const adminReplyingTo = {}; // admin kimga xabar yozmoqda
-const blockedUsers = {}; // block qilingan foydalanuvchilar
+const userStates = {};
+const adminReplyingTo = {};
+const blockedUsers = {};
 
 // Foydalanuvchi menyusi
 function sendMainMenu(chatId, userName) {
@@ -48,7 +48,20 @@ function sendMainMenu(chatId, userName) {
 bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id;
   const userName = msg.from.first_name || "Foydalanuvchi";
-  sendMainMenu(chatId, userName);
+
+  // Admin menyusi
+  if (chatId === ADMIN_CHAT_ID) {
+    const text = "Xush kelibsiz, Admin! Quyidagi menyudan tanlang:";
+    bot.sendMessage(chatId, text, {
+      reply_markup: {
+        keyboard: [["Foydalanuvchilar ro'yxati"], ["Boshqa admin menyu"]],
+        resize_keyboard: true,
+        one_time_keyboard: true,
+      },
+    });
+  } else {
+    sendMainMenu(chatId, userName);
+  }
   userStates[chatId] = null;
 });
 
@@ -56,35 +69,37 @@ bot.onText(/\/start/, (msg) => {
 bot.on("message", (msg) => {
   const chatId = msg.chat.id;
   const text = msg.text;
-  const username = msg.from.username || "username yo‘q";
+  const username = msg.from.username || msg.from.first_name || "username yo‘q";
 
-  if (blockedUsers[chatId]) return; // block qilingan foydalanuvchi
-
-  // Adminga faqat siz kirishingiz mumkin
-  if (chatId === ADMIN_CHAT_ID) {
-    if (text === "Foydalanuvchilar ro'yxati") {
-      const users = Object.keys(userStates);
-      if (users.length === 0) {
-        bot.sendMessage(chatId, "Hozircha foydalanuvchi yo‘q");
-      } else {
-        const buttons = users.map((id) => [
-          { text: `User: ${id}`, callback_data: `message_${id}` },
-        ]);
-        bot.sendMessage(chatId, "Foydalanuvchini tanlang:", {
-          reply_markup: { inline_keyboard: buttons },
-        });
+  // Agar foydalanuvchi blocklangan bo'lsa
+  if (blockedUsers[chatId]) {
+    bot.sendMessage(
+      ADMIN_CHAT_ID,
+      `Blocklangan foydalanuvchi @${username} botga xabar yozmoqchi.\nBlockdan chiqarilsinmi?`,
+      {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "Yoq ❌", callback_data: `deny_${chatId}` }],
+            [
+              {
+                text: "Blockdan chiqarish ✅",
+                callback_data: `unblock_${chatId}`,
+              },
+            ],
+          ],
+        },
       }
-      return;
-    }
+    );
+    return;
+  }
 
-    // Agar admin xabar yozmoqda
-    if (adminReplyingTo[chatId]) {
-      const userChatId = adminReplyingTo[chatId];
-      bot.sendMessage(userChatId, `Admin javobi:\n\n${text}`);
-      bot.sendMessage(chatId, "Xabaringiz foydalanuvchiga yuborildi.");
-      delete adminReplyingTo[chatId];
-      return;
-    }
+  // Admin foydalanuvchilarga xabar yozayotgan bo'lsa
+  if (chatId === ADMIN_CHAT_ID && adminReplyingTo[chatId]) {
+    const userChatId = adminReplyingTo[chatId];
+    bot.sendMessage(userChatId, `Admin javobi:\n\n${text}`);
+    bot.sendMessage(chatId, "Xabaringiz foydalanuvchiga yuborildi.");
+    delete adminReplyingTo[chatId];
+    return;
   }
 
   // Foydalanuvchi menyusini tanlaganida eski state'ni reset qilish
@@ -203,6 +218,19 @@ bot.on("callback_query", (callbackQuery) => {
     blockedUsers[chatId] = true;
     bot.sendMessage(chatId, "Siz block qilindingiz ❌");
     bot.sendMessage(ADMIN_CHAT_ID, `Foydalanuvchi ${chatId} block qilindi`);
+  } else if (action === "unblock") {
+    delete blockedUsers[chatId];
+    bot.sendMessage(
+      chatId,
+      "Siz blockdan chiqarildingiz ✅\nBot qonunlariga rioya qiling!"
+    );
+    bot.sendMessage(
+      ADMIN_CHAT_ID,
+      `Foydalanuvchi ${chatId} blockdan chiqarildi`
+    );
+  } else if (action === "deny") {
+    bot.sendMessage(chatId, "Siz blocklangansiz ❌");
+    bot.sendMessage(ADMIN_CHAT_ID, `Foydalanuvchi ${chatId} blocklangansiz`);
   } else if (action === "message") {
     adminReplyingTo[callbackQuery.from.id] = chatId;
     bot.sendMessage(
