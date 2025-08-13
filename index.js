@@ -19,11 +19,14 @@ app.post(`/bot${token}`, (req, res) => {
   res.sendStatus(200);
 });
 
-const userStates = {};
-const adminReplyingTo = {};
+// State va ro'yxatlar
+const userStates = {}; // foydalanuvchi menyu holati
+const adminReplyingTo = {}; // admin kimga xabar yozmoqda
+const blockedUsers = {}; // block qilingan foydalanuvchilar
 
+// Foydalanuvchi menyusi
 function sendMainMenu(chatId, userName) {
-  const text = `*Salom ${userName}!* \nSavdo X telegram botiga Xush Kelibsiz😊!\n\nQuyidagi menyulardan birini tanlang:\n\n\n Ogohlantirish⚠️ \nSavdo X Botimiz test rejimda ishlamoqda noqlulayliklar uchun uzur so'raymiz☹️`;
+  const text = `*Salom ${userName}!* \nSavdo X telegram botiga Xush Kelibsiz😊!\n\nQuyidagi menyulardan birini tanlang:\n\nOgohlantirish⚠️ \nSavdo X Botimiz test rejimda ishlamoqda noqulayliklar uchun uzr so‘raymiz☹️`;
   const options = {
     parse_mode: "Markdown",
     reply_markup: {
@@ -41,6 +44,7 @@ function sendMainMenu(chatId, userName) {
   bot.sendMessage(chatId, text, options);
 }
 
+// /start
 bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id;
   const userName = msg.from.first_name || "Foydalanuvchi";
@@ -48,56 +52,97 @@ bot.onText(/\/start/, (msg) => {
   userStates[chatId] = null;
 });
 
+// message handler
 bot.on("message", (msg) => {
   const chatId = msg.chat.id;
   const text = msg.text;
   const username = msg.from.username || "username yo‘q";
 
-  if (adminReplyingTo[chatId]) {
-    const userChatId = adminReplyingTo[chatId];
-    bot.sendMessage(userChatId, `Admin javobi:\n\n${text}`);
-    bot.sendMessage(chatId, "Xabaringiz foydalanuvchiga yuborildi.");
-    delete adminReplyingTo[chatId];
-    return;
+  if (blockedUsers[chatId]) return; // block qilingan foydalanuvchi
+
+  // Adminga faqat siz kirishingiz mumkin
+  if (chatId === ADMIN_CHAT_ID) {
+    if (text === "Foydalanuvchilar ro'yxati") {
+      const users = Object.keys(userStates);
+      if (users.length === 0) {
+        bot.sendMessage(chatId, "Hozircha foydalanuvchi yo‘q");
+      } else {
+        const buttons = users.map((id) => [
+          { text: `User: ${id}`, callback_data: `message_${id}` },
+        ]);
+        bot.sendMessage(chatId, "Foydalanuvchini tanlang:", {
+          reply_markup: { inline_keyboard: buttons },
+        });
+      }
+      return;
+    }
+
+    // Agar admin xabar yozmoqda
+    if (adminReplyingTo[chatId]) {
+      const userChatId = adminReplyingTo[chatId];
+      bot.sendMessage(userChatId, `Admin javobi:\n\n${text}`);
+      bot.sendMessage(chatId, "Xabaringiz foydalanuvchiga yuborildi.");
+      delete adminReplyingTo[chatId];
+      return;
+    }
   }
 
+  // Foydalanuvchi menyusini tanlaganida eski state'ni reset qilish
+  const menus = [
+    "Adminga bog‘lanish📲",
+    "Mahsulot egasidan Shikoyat⚠️",
+    "Saytdagi Muammolar🐞",
+    "Saytimizga takliflar📃",
+    "Savdo X saytida mahsulot sotish🛒",
+  ];
+  if (menus.includes(text)) userStates[chatId] = null;
+
+  // Foydalanuvchi menyulari
   if (!userStates[chatId]) {
-    if (text === "Adminga bog‘lanish📲") {
-      bot.sendMessage(chatId, "Xabaringizni yozing📝, men adminga yuboraman.");
-      userStates[chatId] = "waiting_admin_message";
-    } else if (text === "Mahsulot egasidan Shikoyat") {
-      bot.sendMessage(
-        chatId,
-        "Iltimos, shikoyat qilmoqchi bo‘lgan mahsulot nomi va egasining username'ini yuboring:"
-      );
-      userStates[chatId] = "waiting_complaint";
-    } else if (text === "Saytdagi Muammolar🐞") {
-      bot.sendMessage(
-        chatId,
-        "Saytdagi muammolar haqida yozing📝, tez orada ko‘rib chiqamiz👀."
-      );
-      userStates[chatId] = "waiting_site_issues";
-    } else if (text === "Saytimizga takliflar📃") {
-      bot.sendMessage(
-        chatId,
-        "Takliflaringizni yozing, biz ularga albatta e'tibor beramiz😊."
-      );
-      userStates[chatId] = "waiting_suggestions";
-    } else if (text === "Savdo X saytida mahsulot sotish🛒") {
-      bot.sendMessage(
-        chatId,
-        `*Savdo X saytida mahsulot sotish* bo‘yicha:\n\nSavdo X saytida mahsulotni sotish to‘g‘risida qonunlar bor❗ va Savdo X saytimizdan foydalanayotganingiz uchun oyiga 35 ming so‘m💵 to‘lashingiz kerak. Rozi bo‘lsangiz, "Adminga bog‘lanish📞" tugmasini bosing.`,
-        { parse_mode: "Markdown" }
-      );
-      userStates[chatId] = null;
-    } else if (text.startsWith("/start")) {
-    } else {
-      bot.sendMessage(
-        chatId,
-        "Iltimos, menyudan tanlang yoki /start buyrug‘ini yuboring."
-      );
+    switch (text) {
+      case "Adminga bog‘lanish📲":
+        bot.sendMessage(
+          chatId,
+          "Xabaringizni yozing📝, men adminga yuboraman."
+        );
+        userStates[chatId] = "waiting_admin_message";
+        break;
+      case "Mahsulot egasidan Shikoyat⚠️":
+        bot.sendMessage(
+          chatId,
+          "Iltimos, shikoyat qilmoqchi bo‘lgan mahsulot nomi va egasining username'ini yuboring:"
+        );
+        userStates[chatId] = "waiting_complaint";
+        break;
+      case "Saytdagi Muammolar🐞":
+        bot.sendMessage(
+          chatId,
+          "Saytdagi muammolar haqida yozing📝, tez orada ko‘rib chiqamiz👀."
+        );
+        userStates[chatId] = "waiting_site_issues";
+        break;
+      case "Saytimizga takliflar📃":
+        bot.sendMessage(
+          chatId,
+          "Takliflaringizni yozing, biz ularga albatta e'tibor beramiz😊."
+        );
+        userStates[chatId] = "waiting_suggestions";
+        break;
+      case "Savdo X saytida mahsulot sotish🛒":
+        bot.sendMessage(
+          chatId,
+          `*Savdo X saytida mahsulot sotish* bo‘yicha:\n\nSavdo X saytida mahsulotni sotish to‘g‘risida qonunlar bor❗ va Savdo X saytimizdan foydalanayotganingiz uchun oyiga 35 ming so‘m💵 to‘lashingiz kerak. Rozi bo‘lsangiz, "Adminga bog‘lanish📞" tugmasini bosing.`,
+          { parse_mode: "Markdown" }
+        );
+        break;
+      default:
+        bot.sendMessage(
+          chatId,
+          "Iltimos, menyudan tanlang yoki /start buyrug‘ini yuboring."
+        );
     }
   } else {
+    // foydalanuvchi xabar yuboradi va adminga forward qilinadi
     let forwardedMessage = "";
     switch (userStates[chatId]) {
       case "waiting_admin_message":
@@ -124,6 +169,7 @@ bot.on("message", (msg) => {
           [
             { text: "Qabul qilaman✅", callback_data: `accept_${chatId}` },
             { text: "Bekor qilaman❌", callback_data: `reject_${chatId}` },
+            { text: "Block qilaman🚫", callback_data: `block_${chatId}` },
           ],
         ],
       },
@@ -137,6 +183,7 @@ bot.on("message", (msg) => {
   }
 });
 
+// callback_query handler
 bot.on("callback_query", (callbackQuery) => {
   const data = callbackQuery.data;
   const [action, userChatId] = data.split("_");
@@ -152,11 +199,22 @@ bot.on("callback_query", (callbackQuery) => {
   } else if (action === "reject") {
     bot.sendMessage(chatId, "Admin sizning xabaringizni bekor qildi ❌");
     bot.sendMessage(ADMIN_CHAT_ID, "Siz foydalanuvchini bekor qildingiz❌.");
+  } else if (action === "block") {
+    blockedUsers[chatId] = true;
+    bot.sendMessage(chatId, "Siz block qilindingiz ❌");
+    bot.sendMessage(ADMIN_CHAT_ID, `Foydalanuvchi ${chatId} block qilindi`);
+  } else if (action === "message") {
+    adminReplyingTo[callbackQuery.from.id] = chatId;
+    bot.sendMessage(
+      callbackQuery.from.id,
+      "Xabar yozing, foydalanuvchiga yuboriladi:"
+    );
   }
 
   bot.answerCallbackQuery(callbackQuery.id);
 });
 
+// server
 app.listen(PORT, () => {
   console.log(`Server ${PORT} portda ishlayapti ✅`);
 });
